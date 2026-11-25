@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>剧名查播 · YouTube</title>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="index.html"
+        ><span class="brand-icon">▶</span> 剧名查播 <small>YOUTUBE</small></a
+      ><span class="local-note">本机处理 · 无需 API Key</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">剧名搜索</p>
+          <h1>输入剧名，<br />看搜索结果。</h1>
+          <p class="intro-copy">
+            每行一个剧名，最多 20 个。打开对应的 YouTube 搜索页，<br />保留标题包含完整剧名的视频，并带回卡片上的播放量和相对时间。
+          </p>
+        </div>
+        <div class="rule-card">
+          <span>搜索规则</span>
+          <dl>
+            <div>
+              <dt>输入</dt>
+              <dd>最多 20 个</dd>
+            </div>
+            <div>
+              <dt>标题匹配</dt>
+              <dd>包含完整剧名</dd>
+            </div>
+            <div>
+              <dt>返回内容</dt>
+              <dd>播放量与时间</dd>
+            </div>
+          </dl>
+          <p>只读取搜索页初次出现的普通视频，不进入视频详情页。</p>
+        </div>
+      </section>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <section class="panel" id="script-panel">
+        <div class="section-title">
+          <div>
+            <span class="step-number">00</span>
+            <h2>文件夹监视</h2>
+          </div>
+          <span id="script-state">已关闭</span>
+        </div>
+        <div class="script-row">
+          <label for="script-switch"
+            ><input id="script-switch" type="checkbox" />
+            让扩展向本机脚本领取剧名</label
+          >
+          <p class="muted">
+            打开后大约每 30 秒向 127.0.0.1
+            上的脚本要一部剧，关掉这个页面也不会停。
+          </p>
+        </div>
+      </section>
+      <section class="panel" id="entry-panel">
+        <div class="section-title">
+          <div>
+            <span class="step-number">01</span>
+            <h2>输入剧名</h2>
+          </div>
+          <span>一行一个</span>
+        </div>
+        <label class="names-label" for="names">剧名，每行一个</label
+        ><textarea id="names" rows="8" placeholder="冰山学姐沦陷了"></textarea>
+        <div class="import-footer">
+          <p id="entry-summary">
+            本次结果只保留在这个页面。关闭页面即停止搜索。
+          </p>
+          <button id="start" class="primary" type="button">
+            开始搜索 <span>→</span>
+          </button>
+        </div>
+      </section>
+      <section class="panel" id="job-panel" hidden>
+        <div class="section-title">
+          <div>
+            <span class="step-number">02</span>
+            <h2>搜索进度</h2>
+            <span id="job-status" class="badge"></span>
+          </div>
+          <button id="clear" class="quiet" type="button">停止并清除</button>
+        </div>
+        <div class="metrics">
+          <div>
+            <span>已处理 / 总剧名</span
+            ><strong id="metric-progress">0 / 0</strong>
+          </div>
+          <div><span>匹配视频</span><strong id="metric-videos">0</strong></div>
+          <div><span>失败剧名</span><strong id="metric-failed">0</strong></div>
+          <div><span>当前剧名</span><strong id="metric-current">—</strong></div>
+        </div>
+        <progress id="progress" max="1" value="0"></progress>
+        <p id="job-notice" class="muted"></p>
+      </section>
+      <section class="panel results-panel">
+        <div class="section-title">
+          <div>
+            <h2>查询结果</h2>
+            <span id="result-count" class="muted">等待搜索</span>
+          </div>
+        </div>
+        <div id="empty-state">
+          <div class="empty-icon">▤</div>
+          <h3>你的查询结果会出现在这里</h3>
+          <p>先输入剧名。没有匹配或读取失败的剧名也会保留记录。</p>
+        </div>
+        <div id="table-wrap" hidden>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>剧名</th>
+                  <th>视频标题</th>
+                  <th>播放量</th>
+                  <th>相对时间</th>
+                  <th>状态</th>
+                  <th>链接</th>
+                </tr>
+              </thead>
+              <tbody id="results"></tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span id="page-info"></span>
+            <div class="buttons">
+              <button id="previous" type="button">上一页</button
+              ><button id="next" type="button">下一页</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer>
+        播放量和相对时间来自搜索卡片原文。没有匹配只表示这次搜索页上没有标题相符的视频。
+      </footer>
+    </main>
+    <script type="module" src="/src/ui.ts"></script>
+  </body>
+</html>

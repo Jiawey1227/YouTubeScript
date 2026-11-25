@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "剧名查播 · YouTube",
+  "version": "0.1.0",
+  "description": "输入剧名，搜索标题包含该剧名的 YouTube 视频，并记录搜索结果上的播放量与相对时间。",
+  "minimum_chrome_version": "120",
+  "permissions": ["scripting", "alarms", "storage"],
+  "host_permissions": ["https://www.youtube.com/*", "http://127.0.0.1:17321/*"],
+  "action": {
+    "default_title": "打开剧名查播"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
