@@ -39,7 +39,17 @@ const lifecycle = createWatchLifecycle();
 lifecycle.init(Date.now());
 
 let watchers: FSWatcher[] = [];
-const closeWatchers = () => {
+let staggerTimers: NodeJS.Timeout[] = [];
+let watcherSession = 0;
+
+const clearStaggerTimers = () => {
+  for (const timer of staggerTimers) clearTimeout(timer);
+  staggerTimers = [];
+};
+
+const closeWatchersImmediately = () => {
+  watcherSession++;
+  clearStaggerTimers();
   for (const watcher of watchers) {
     try {
       watcher.close();
@@ -50,29 +60,60 @@ const closeWatchers = () => {
   watchers = [];
 };
 
-const openWatchers = () => {
-  closeWatchers();
-  for (const source of sources) {
-    try {
-      const watcher = watch(source, () => {
-        lifecycle.notifyEvent();
-      });
-      watcher.on('error', () => {
-        /* 共享盘短暂断开时不崩溃，等待下个周期重连 */
-      });
-      watchers.push(watcher);
-    } catch {
-      /* 无法建立监听时跳过，等待下个周期重试 */
-    }
+const closeWatchersStaggered = () => {
+  const session = ++watcherSession;
+  clearStaggerTimers();
+  const toClose = watchers.splice(0);
+  let delay = 0;
+  for (let index = 0; index < toClose.length; index++) {
+    const watcher = toClose[index];
+    if (index > 0) delay += 1000 + Math.floor(Math.random() * 3000);
+    const timer = setTimeout(() => {
+      if (watcherSession !== session) return;
+      try {
+        watcher.close();
+      } catch {
+        /* ignore */
+      }
+    }, delay);
+    staggerTimers.push(timer);
   }
 };
 
+const openWatchers = () => {
+  closeWatchersImmediately();
+  const session = watcherSession;
+  let delay = 0;
+  for (let index = 0; index < sources.length; index++) {
+    const source = sources[index];
+    if (index > 0) delay += 2000 + Math.floor(Math.random() * 4000);
+    const timer = setTimeout(() => {
+      if (watcherSession !== session) return;
+      try {
+        const watcher = watch(source, () => {
+          lifecycle.notifyEvent();
+        });
+        watcher.on('error', () => {
+          /* 共享盘短暂断开时不崩溃，等待下个周期重连 */
+        });
+        watchers.push(watcher);
+      } catch {
+        /* 无法建立监听时跳过，等待下个周期重试 */
+      }
+    }, delay);
+    staggerTimers.push(timer);
+  }
+};
+
+let watchingActive = false;
 const syncWatchers = (nowMs: number) => {
   const { phase, changed } = lifecycle.tick(nowMs, queue.hasPending());
-  if (phase === 'watching' && watchers.length === 0) {
+  if (phase === 'watching' && !watchingActive) {
+    watchingActive = true;
     openWatchers();
-  } else if (phase !== 'watching' && watchers.length > 0) {
-    closeWatchers();
+  } else if (phase !== 'watching' && watchingActive) {
+    watchingActive = false;
+    closeWatchersStaggered();
   }
   if (changed) {
     const until = new Date(lifecycle.phaseUntil()).toLocaleTimeString('zh-CN', {
@@ -82,15 +123,18 @@ const syncWatchers = (nowMs: number) => {
       phase === 'watching'
         ? '开始监听'
         : phase === 'resting'
-          ? '暂停监听（释放目录句柄）'
-          : '夜间休眠（彻底关闭监听）';
+          ? '暂停监听（错峰释放目录句柄）'
+          : '夜间休眠（错峰关闭监听）';
     console.log(
       `[${new Date(nowMs).toLocaleTimeString('zh-CN', { hour12: false })}] ${label}，预计持续至 ${until}`,
     );
   }
 };
 
-if (lifecycle.phase() === 'watching') openWatchers();
+if (lifecycle.phase() === 'watching') {
+  watchingActive = true;
+  openWatchers();
+}
 
 let server;
 try {
@@ -104,7 +148,7 @@ try {
     },
   });
 } catch (error) {
-  closeWatchers();
+  closeWatchersImmediately();
   const code = (error as NodeJS.ErrnoException).code;
   exit(code === 'EADDRINUSE' ? '端口已被占用。' : '无法监听本机端口。');
 }
@@ -115,7 +159,7 @@ try {
   releaseOutput = await acquireLock(output);
   releaseSources = await acquireSourceLocks(sources);
 } catch (error) {
-  closeWatchers();
+  closeWatchersImmediately();
   server.server.close();
   exit(error instanceof Error ? error.message : '无法锁定文件夹。');
 }
@@ -147,7 +191,7 @@ const stop = () => {
   if (stopping) return;
   stopping = true;
   clearInterval(timer);
-  closeWatchers();
+  closeWatchersImmediately();
   server.server.close();
   void (async () => {
     await persistIfChanged();
